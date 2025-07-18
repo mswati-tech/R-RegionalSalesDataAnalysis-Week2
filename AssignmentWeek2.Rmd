@@ -1,0 +1,301 @@
+---
+title: "AssignmentWeek2"
+author: "Swati Mishra"
+date: "2025-07-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+#Introduction
+
+#Kaggle sales dataset was downloaded from: 
+#<https://www.kaggle.com/datasets/himelsarder/retail-product-dataset-with-missing-values>
+#as it contains missing values
+#This project involves sales data analysis aimed at extracting meaningful insights across 
+#time, region, and product categories. The dataset includes information on Revenue, 
+#Units_Sold, Category, Region. Using the dplyr, ggplot2, lubridate, tidyverse, we clean, 
+#transform, and visualize the dataset to:
+#Classify performance based on revenue, Identify top-selling products in specific regions
+#Track revenue trends over time, Generate informative visualizations (bar charts, line 
+#graphs, stacked bars)
+#Summarize quarterly patterns for business performance tracking
+#The goal is to support data-driven decisions related to product focus, regional strategy, 
+#and time-based trends.
+
+#Loaded installed packages
+library(dplyr)
+library(lubridate)
+library(rmarkdown)
+library(tidyverse)
+library(tidyr)
+library(ggplot2)
+
+#Put the file in the same folder as R and read the file "synthetic_dataset.csv" into a dataframe
+sales_data <- read.csv("synthetic_dataset.csv")
+
+#Viewed the structure of the dataframe that input the dataset CSV file
+str(sales_data)
+
+#Since there is no "Region" column in the downloaded sataset, therefore mutating the
+#sales_data with randomly populating regions
+
+#Vector definition containing region names
+#North America, Europe, Asia-Pacific, Latin America, Middle East, and Rest of World (RoW)
+regions <- c("North America","Europe","Asia-Pacific","Latin America","Middle East","RoW")
+
+#Defining start and end date
+start_date <- as.Date("2022-01-01")
+end_date <- as.Date("2025-07-18")
+
+#created a vector of a sequence of dates
+dates <- seq.Date(from=start_date, to=end_date, by = "day")
+
+#Setting seed for reproduciblity
+set.seed(42)
+
+#Mutating the sales_data by adding a Date column
+sales_data$Date <- sample(dates,size=nrow(sales_data),replace=TRUE)
+
+#Mutating the sales_data by adding a Region column
+sales_data$Region <- sample(regions,size=nrow(sales_data),replace=TRUE)
+
+#Viewing the updated dataframe
+head(sales_data)
+
+#Showing all missing values using the is.na() function
+is.na(sales_data)
+
+#Counting all missing values using the sum() function
+sum(is.na(sales_data))
+
+#Mutating the dataset by randomly populating a new column for Units_Sold
+#Generated random units sold between 50 and 200
+sales_data$Units_Sold <- sample(50:200,size=nrow(sales_data),replace = TRUE)
+
+#View the head of the dataset
+head(sales_data)
+
+#Mutating the dataset and populating a Revenue column with Price, Units_Sold, and Discount
+#Formula: Revenue = Units_Sold * (Price-Discount)
+
+#Created Revenue column using base R
+sales_data$Revenue <- sales_data$Units_Sold * (sales_data$Price - sales_data$Discount)
+
+#View the updated dataframe
+head(sales_data)
+
+#Checking if there are any missing values in Price & Discount columns
+sum(is.na(sales_data$Discount))
+sum(is.na(sales_data$Price))
+
+#The above code snipppet showed that there are missing values in the column Price and Discount
+#Since there is no column for Units_Sold, I have considered Price and Discount to be the columns
+#where the missing values will be replaced by the column mean
+
+#Populated the Discount column with the mean of the column
+sales_data$Discount <- mean(sales_data$Discount,na.rm=TRUE)
+
+#Populated the Price column with the column mean
+sales_data$Price <- mean(sales_data$Price,na.rm=TRUE)
+
+#Checking again if there are any missing values in Price & Discount columns
+sum(is.na(sales_data$Discount))
+sum(is.na(sales_data$Price))
+
+#View the updated dataframe
+head(sales_data)
+
+#Number of rows before cleaning NA values in revenue: Output is 553
+sum(is.na(sales_data$Revenue))
+
+#Dropping rows where revenue is NA
+sales_data_cleaned <- sales_data[!is.na(sales_data$Revenue),]
+
+#Number of rows after cleaning NA values in revenue: Output is 0
+sum(is.na(sales_data_cleaned$Revenue))
+
+#I don't need to convert the date column to date type since I have 
+#generated the Date column using as.Date()
+
+#Instead of that task, I will confirm the class of Date column in the dataset
+class(sales_data_cleaned$Date)
+
+#Mutating: Create new columns with Year, Month, and Weekday
+sales_data_cleaned$Year <- year(sales_data_cleaned$Date)
+sales_data_cleaned$Month <- month(sales_data_cleaned$Date,label=TRUE)
+sales_data_cleaned$Weekday <- wday(sales_data_cleaned$Date,label=TRUE)
+
+#View the dataset
+head(sales_data_cleaned)
+
+#Aggregating to get total sales per month
+total_monthly_sales <- aggregate(Revenue ~ Month, data = sales_data_cleaned, FUN=sum)
+
+#Finding month with maximum revenue
+max_month <- total_monthly_sales[which.max(total_monthly_sales$Revenue),]
+print(max_month)
+
+#Aggregating to get average sales per day
+avg_day_sales <- aggregate(Units_Sold ~ Weekday, data = sales_data_cleaned, FUN=mean)
+
+#Finding day with the minimum average units sold
+min_day <- avg_day_sales[which.min(avg_day_sales$Units_Sold),]
+print(min_day)
+
+#Created YearMonth column that contains every month of each year
+sales_data_cleaned$YearMonth <- format(sales_data_cleaned$Date, "%Y-%m")
+
+#Sorted all Year-Month combinations in ascending order beginning from start date and ending
+#at the end date provided in the beginning of the code and stored in a vector
+sort_ym <- sort(unique(sales_data_cleaned$YearMonth))
+
+#Printed to check the sort_ym vector 
+print(sort_ym)
+
+#For loop wherever the ym variable is equal to the sales_data_cleaned$YearMonth, giving a
+#TRUE value, sum it up as a single revenue
+#Used the paste function to concatenate strings
+#Lastly printed the message to check the output
+for (ym in sort_ym) {
+  monthly_revenue <- sum(sales_data_cleaned$Revenue[sales_data_cleaned$YearMonth == ym])
+  msg <- paste("Total Revenue for", ym, ":", monthly_revenue)
+  print(msg)
+}
+
+#Calculated the average revenue
+avg_rev <- mean(sales_data_cleaned$Revenue)
+
+#Created a Performance column and gave the if-else condition
+sales_data_cleaned$Performance <- ifelse(sales_data_cleaned$Revenue > avg_rev, "High", "Low")
+
+#Checked the updated dataframe
+head(sales_data_cleaned)
+
+#Checked if the Performance column does not have any NA values: Output was 0
+sum(is.na(sales_data_cleaned$Performance))
+
+#Aggregating total revenue by region
+total_rev_reg <- aggregate(Revenue ~ Region, data = sales_data_cleaned, FUN=sum)
+#Checked the output
+print(total_rev_reg)
+
+#Aggregating average units sold by category
+avg_units_cat <- aggregate(Units_Sold ~ Category, data=sales_data_cleaned, FUN=mean)
+#Checked the output
+print(avg_units_cat)
+
+#Finding out region with highest average revenue
+avg_rev_reg <- aggregate(Revenue ~ Region, data=sales_data_cleaned, FUN=mean)
+max_reg <- avg_rev_reg[which.max(avg_rev_reg$Revenue),]
+#Checking the output
+print(max_reg)
+
+#Creating a function region_report with the passed region_name variable
+region_report <- function(region_name){
+  
+#Filter the Region column with region_name
+region_data <- filter(sales_data_cleaned, Region == region_name)
+  
+#Finding the total revenue in the region_name
+total_rev_rn <- sum(region_data$Revenue)
+  
+#Aggregated units sold by category
+total_units_cat_rn <- aggregate(Units_Sold ~ Category, data = region_data, FUN = sum)
+  
+#Sorted in descending order of Units_Sold
+total_units_cat_rn <- total_units_cat_rn[order(-total_units_cat_rn$Units_Sold), ]
+
+#Slicing the top sold category
+top_sold_cat <- head(total_units_cat_rn, 1)
+  
+#Sort the days as per the date when the performance was High 
+days_high <- sort(region_data$Date[region_data$Performance == "High"])
+  
+#Return as a list
+return(list(Total_revenue=total_rev_rn, Top_sold_category=top_sold_cat, 
+              High_performance_days=days_high))
+}
+
+#Function called in the main program
+print(region_report("North America"))
+
+#Analyzing quarterly revenue trend
+sales_data_cleaned <- sales_data_cleaned %>%
+  mutate(YearMonth = ym(YearMonth))  # 'ym' handles "YYYY-MM" format
+
+sales_data_cleaned <- sales_data_cleaned %>%
+  mutate(YearQuarter = paste0(year(YearMonth), "-Q", quarter(YearMonth)))
+
+quarterly_revenue <- sales_data_cleaned %>%
+  group_by(YearQuarter) %>%
+  summarise(Total_Revenue = sum(Revenue, na.rm = TRUE))
+
+quarterly_revenue$YearQuarter <- factor(quarterly_revenue$YearQuarter, 
+                                        levels = unique(quarterly_revenue$YearQuarter))
+#Conclusion
+
+#Through this analysis, we discovered:
+#(1)High-performing product categories and regions based on total units sold and revenue
+#(2)Quarterly revenue trends that help identify seasonal patterns
+#(3)Performance-based classification of products
+#(4)Visualizations that clearly communicate where revenue and sales efforts are concentrated
+
+#This analysis can be extended with forecasting models, product lifecycle analysis, or 
+#customer segmentation. It equips stakeholders with evidence-backed insights to refine 
+#inventory, marketing, and sales strategies across quarters.
+
+
+
+
+
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r, echo=TRUE}
+
+#Bar chart showing total revenue by region
+region_bar_plot <- ggplot(sales_data_cleaned, aes(x = Region, y = Revenue)) +
+  geom_bar(stat = "summary", fun = "sum", fill = "steelblue") +
+  labs(title = "Total Revenue by Region", x = "Region", y = "Total Revenue") +
+  theme_minimal()
+
+#Line chart showing revenue trend over time
+quarterly_line_plot <- ggplot(quarterly_revenue, aes(x = YearQuarter, y = Total_Revenue, group = 1)) +
+  geom_line(color = "steelblue", size = 1.2) +
+  geom_point(color = "navy", size = 2) +
+  labs(title = "Quarterly Revenue Trend",
+       x = "Year-Quarter",
+       y = "Total Revenue") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Stacked bar chart of Units Sold per Product split by Performance
+stacked_bar_plot <- ggplot(sales_data_cleaned, aes(x = Category, y = Units_Sold, fill = Performance)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Units Sold by Product and Performance", x = "Product", y = "Units Sold") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Save plots
+ggsave("region_vs_revenue_bar.png", region_bar_plot)
+ggsave("quarterly_revenue_line.png", quarterly_line_plot)
+ggsave("product_units_stacked_bar.png", stacked_bar_plot)
+
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
